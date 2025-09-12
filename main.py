@@ -62,10 +62,11 @@ def accuracy(y_pred, y_true):
     return accuracy_score
 
 learn_rate = 0.005
-epoc_limit = 1000
+epoc_limit = 500
 
 col_names = ['fLength', 'fWidth', 'fSize', 'fConc', 'fConc1', 'fAsym', 'fM3Long', 'fM3Trans', 'fAlpha', 'fDist', 'class']
 
+# Carga los datos
 df = pd.read_csv('magic04.data', header=None, names=col_names)
 
 # Mezcla los datos
@@ -79,28 +80,94 @@ df_norm['class'] = class_col
 df = df_norm
 df['class'] = df['class'].map({'g': 0, 'h': 1})
 
-df_train = df[len(df)//2:]
-df_test = df[:len(df)//2]
+
+# Divide los datos en un 80% para entrenamiento+validación y un 20% para prueba
+train_val_split = int(0.8 * len(df))
+df_train_val = df[:train_val_split]
+df_test = df[train_val_split:]
+
+# Ahora divide el conjunto de entrenamiento+validación en un 75% para entrenamiento y 25% para validación
+val_split = int(0.75 * len(df_train_val))
+df_train = df_train_val[:val_split]
+df_val = df_train_val[val_split:]
+
 print("Train shape:", df_train.shape)
+print("Validation shape:", df_val.shape)
 print("Test shape:", df_test.shape)
 
-theta = np.random.rand(df_train.shape[1]-1)
+# === Actualiza las variables de datos para el entrenamiento y crea las de validación ===
+x_train = df_train.drop('class', axis=1).values
+y_train = df_train['class'].values
+
+x_val = df_val.drop('class', axis=1).values
+y_val = df_val['class'].values
+
+
+# ... (código anterior hasta la definición de df_val)
+
+# === Código modificado para guardar y mostrar métricas de entrenamiento y validación ===
+
+# Inicializa las listas para guardar los errores y la precisión por época
+train_errors = []
+val_errors = []
+train_accuracies = []
+val_accuracies = []
+
+theta = np.random.rand(x_train.shape[1])
 b = np.random.rand(1)[0]
 print("Initial coefficients:", theta, b)
 
 error = 1
 epoc = 0
-
-x_train = df_train.drop('class', axis=1).values
-y_train = df_train['class'].values
 while (error > 0.01 and epoc < epoc_limit):
-  theta, b = update(x_train, theta, b, y_train)
-  error = binary_cross_entropy(x_train, theta, b, y_train)
-  if epoc % 100 == 0:  
-        print(f"Epoc: {epoc}, Error: {error:.6f}")
+    # Actualizar los parámetros
+    theta, b = update(x_train, theta, b, y_train)
+
+    # Calcular y guardar el error de entrenamiento
+    train_error = binary_cross_entropy(x_train, theta, b, y_train)
+    train_errors.append(train_error)
+
+    # Calcular y guardar el error de validación
+    val_error = binary_cross_entropy(x_val, theta, b, y_val)
+    val_errors.append(val_error)
+
+    # Calcular y guardar la precisión en ambos conjuntos
+    y_pred_train = predict(x_train, theta, b)
+    train_accuracy = accuracy(y_pred_train, y_train)
+    train_accuracies.append(train_accuracy)
+
+    y_pred_val = predict(x_val, theta, b)
+    val_accuracy = accuracy(y_pred_val, y_val)
+    val_accuracies.append(val_accuracy)
     
-  epoc += 1
-	
+    # Imprime el progreso cada 100 épocas
+    if epoc % 100 == 0: 
+      print(f"Epoc: {epoc}, Train Error: {train_error:.6f}, Val Error: {val_error:.6f}, Train Acc: {train_accuracy:.4f}, Val Acc: {val_accuracy:.4f}")
+    
+    error = train_error
+    epoc += 1
+    
+
+
+
+# --- Código para graficar las curvas de error ---
+plt.figure(figsize=(10, 6))
+
+# Grafica el error de entrenamiento y de validación
+plt.plot(train_errors, label='Error de Entrenamiento')
+plt.plot(val_errors, label='Error de Validación')
+
+# Agrega títulos y etiquetas
+plt.title('Curvas de Aprendizaje: Error vs. Épocas')
+plt.xlabel('Épocas')
+plt.ylabel('Error (Binary Cross-Entropy)')
+plt.legend()
+plt.grid(True)
+
+# Muestra el gráfico
+plt.show()
+
+
 print("Final coefficients:", theta, b)
 
 x_test = df_test.drop('class', axis=1).values
