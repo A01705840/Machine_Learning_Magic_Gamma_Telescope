@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+from sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score, roc_curve, auc
+from scipy.optimize import minimize
 
 def normalize(df):
   result = df.copy()
@@ -62,7 +64,8 @@ def accuracy(y_pred, y_true):
     return accuracy_score
 
 learn_rate = 0.005
-epoc_limit = 500
+print('learning rate:', learn_rate)
+epoc_limit = 6000
 
 col_names = ['fLength', 'fWidth', 'fSize', 'fConc', 'fConc1', 'fAsym', 'fM3Long', 'fM3Trans', 'fAlpha', 'fDist', 'class']
 
@@ -95,17 +98,12 @@ print("Train shape:", df_train.shape)
 print("Validation shape:", df_val.shape)
 print("Test shape:", df_test.shape)
 
-# === Actualiza las variables de datos para el entrenamiento y crea las de validación ===
+# Actualiza las variables de datos para el entrenamiento y crea las de validación
 x_train = df_train.drop('class', axis=1).values
 y_train = df_train['class'].values
 
 x_val = df_val.drop('class', axis=1).values
 y_val = df_val['class'].values
-
-
-# ... (código anterior hasta la definición de df_val)
-
-# === Código modificado para guardar y mostrar métricas de entrenamiento y validación ===
 
 # Inicializa las listas para guardar los errores y la precisión por época
 train_errors = []
@@ -148,8 +146,6 @@ while (error > 0.01 and epoc < epoc_limit):
     epoc += 1
     
 
-
-
 # --- Código para graficar las curvas de error ---
 plt.figure(figsize=(10, 6))
 
@@ -167,6 +163,22 @@ plt.grid(True)
 # Muestra el gráfico
 plt.show()
 
+
+plt.figure(figsize=(10, 6))
+
+# Grafica el acc de entrenamiento y de validación
+plt.plot(train_accuracies, label='Error de Entrenamiento')
+plt.plot(val_accuracies, label='Error de Validación')
+
+# Agrega títulos y etiquetas
+plt.title('Curvas de Aprendizaje: Error vs. Épocas')
+plt.xlabel('Épocas')
+plt.ylabel('Error (Binary Cross-Entropy)')
+plt.legend()
+plt.grid(True)
+
+# Muestra el gráfico
+plt.show()
 
 print("Final coefficients:", theta, b)
 
@@ -199,4 +211,85 @@ ax2.grid(True)
 ax2.legend()
 
 plt.tight_layout()
+plt.show()
+
+# Function to calculate log-likelihood for McFadden's R^2
+def log_likelihood(y_true, y_pred_prob):
+    eps = 1e-10
+    return np.sum(y_true * np.log(y_pred_prob + eps) + (1 - y_true) * np.log(1 - y_pred_prob + eps))
+
+# Calculate Log-Likelihood of the full model
+y_pred_test_prob = predict(x_test, theta, b)
+ll_model = log_likelihood(y_test, y_pred_test_prob)
+
+# Calculate Log-Likelihood of the null model (predicting the mean)
+mean_y = np.mean(y_test)
+ll_null = np.sum(y_test * np.log(mean_y) + (1 - y_test) * np.log(1 - mean_y))
+
+# Calculate McFadden's R^2
+mc_r2 = 1 - (ll_model / ll_null)
+print(f"McFadden's R^2: {mc_r2:.4f}")
+
+# --- Classification Report ---
+# Convert probabilities to binary predictions
+y_pred_binary = (y_pred_test_prob >= 0.5).astype(int)
+
+# Calculate confusion matrix
+cm = confusion_matrix(y_test, y_pred_binary)
+tn, fp, fn, tp = cm.ravel()
+
+print("\nConfusion Matrix:")
+print(cm)
+print(f"True Positives (TP): {tp}")
+print(f"False Positives (FP): {fp}")
+print(f"True Negatives (TN): {tn}")
+print(f"False Negatives (FN): {fn}")
+
+# Calculate other metrics
+precision = precision_score(y_test, y_pred_binary)
+recall = recall_score(y_test, y_pred_binary)
+f1 = f1_score(y_test, y_pred_binary)
+
+print(f"\nPrecision: {precision:.4f}")
+print(f"Recall: {recall:.4f}")
+print(f"F1-Score: {f1:.4f}")
+
+
+
+# --- Código para la Curva ROC y el AUC ---
+
+# Obtiene las probabilidades predichas del conjunto de prueba
+# Tu función 'predict' ya hace esto.
+y_pred_test_prob = predict(x_test, theta, b)
+
+# Calcula la Tasa de Falsos Positivos (FPR),
+# la Tasa de Verdaderos Positivos (TPR),
+# y los umbrales de decisión.
+# La función roc_curve de sklearn necesita los valores reales (y_true)
+# y las probabilidades predichas (y_pred_prob).
+fpr, tpr, thresholds = roc_curve(y_test, y_pred_test_prob)
+
+# Calcula el Área Bajo la Curva (AUC)
+roc_auc = auc(fpr, tpr)
+
+# Imprime el valor del AUC
+print(f"\nAUC-ROC Score: {roc_auc:.4f}")
+
+# --- Código para graficar la Curva ROC ---
+plt.figure(figsize=(8, 8))
+
+# Dibuja la curva ROC
+plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (area = {roc_auc:.4f})')
+
+# Dibuja la línea de clasificación aleatoria (curva de referencia)
+plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--', label='Random Classifier (area = 0.5)')
+
+# Agrega los títulos y etiquetas
+plt.xlabel('False Positive Rate (FPR)')
+plt.ylabel('True Positive Rate (TPR)')
+plt.title('Receiver Operating Characteristic (ROC) Curve')
+plt.legend(loc="lower right")
+plt.grid(True)
+
+# Muestra el gráfico
 plt.show()

@@ -1,8 +1,11 @@
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.metrics import accuracy_score
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, confusion_matrix, precision_score, recall_score, f1_score
+from scipy.optimize import minimize
+from sklearn import tree
+import matplotlib.pyplot as plt
 
 col_names = ['fLength', 'fWidth', 'fSize', 'fConc', 'fConc1', 'fAsym', 'fM3Long', 'fM3Trans', 'fAlpha', 'fDist', 'class']
 df = pd.read_csv('magic04.data', header=None, names=col_names)
@@ -17,6 +20,11 @@ def normalize(df):
         min_value = df[feature_name].min()
         result[feature_name] = (df[feature_name] - min_value) / (max_value - min_value)
     return result
+
+def log_likelihood(y_true, y_pred_prob):
+    eps = 1e-10
+    return np.sum(y_true * np.log(y_pred_prob + eps) + (1 - y_true) * np.log(1 - y_pred_prob + eps))
+
 df_to_norm = df.drop('class', axis=1)
 df_norm = normalize(df_to_norm)
 df_norm['class'] = df['class']
@@ -40,7 +48,8 @@ print("Train shape:", X_train.shape)
 print("Validation shape:", X_val.shape)
 print("Test shape:", X_test.shape)
 
-model = DecisionTreeClassifier(random_state=42)
+# El hiperparámetro n_estimators define el número de árboles en el bosque
+model = RandomForestClassifier(n_estimators=250, random_state=42)
 
 model.fit(X_train, y_train)
 
@@ -57,3 +66,5 @@ test_accuracy = accuracy_score(y_test, y_pred_test)
 print(f"\nTraining Accuracy: {train_accuracy:.4f}")
 print(f"Validation Accuracy: {val_accuracy:.4f}")
 print(f"Test Accuracy: {test_accuracy:.4f}")
+
+
